@@ -3,6 +3,9 @@ This script is used to test the OllamaLLM model.
 """
 from langchain_ollama import ChatOllama
 from langchain_core.prompts import ChatPromptTemplate
+from langchain.agents import initialize_agent
+from langchain.memory import ConversationBufferMemory
+from tools import insert_data, read_data, update_data, fetch_schema, create_table
 
 llm = ChatOllama(
     model="llama3:8b",
@@ -10,19 +13,26 @@ llm = ChatOllama(
     base_url="http://127.0.0.1:11434",
 )
 
-messages = [("system", "You are a helpful assistant.")]
+memory = ConversationBufferMemory(memory_key="chat_history")
 
-while True:
-    user_input = input("Enter your message (q to quit): ")
-    if user_input == "q":
-        break
+prompt_template = ChatPromptTemplate.from_messages([
+    ("system", "You are a helpful assistant."),
+    ("user", "{input}"),
+])
 
-    messages.append(("user", user_input))
+agent = initialize_agent(
+    tools=[insert_data, read_data, update_data, fetch_schema, create_table],
+    llm=llm,
+    memory=memory,
+    verbose=True,
+    handle_parsing_errors=True,
+)
 
-    prompt = ChatPromptTemplate.from_messages(messages)
-    chain = prompt | llm
 
-    response = chain.invoke({"input": user_input})
-    print(response.content)
-
-    messages.append(("assistant", response.content))
+if __name__ == "__main__":
+    while True:
+        input_text = input("Enter your message (q to quit): ")
+        if input_text == "q":
+            break
+        response = agent.invoke({"input": input_text})
+        print(response.content)
